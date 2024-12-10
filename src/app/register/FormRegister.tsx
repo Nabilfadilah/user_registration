@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import {useRouter, useSearchParams} from "next/navigation";
 import React from "react";
+import {SubmitHandler, useForm} from "react-hook-form";
+import toast from "react-hot-toast";
 
 type Inputs = {
   name: string;
@@ -9,6 +14,57 @@ type Inputs = {
 };
 
 const FormRegister = () => {
+  const params = useSearchParams();
+  const router = useRouter();
+  let callbackUrl = params.get("callbackUrl") || "/";
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    formState: {errors, isSubmitting},
+  } = useForm<Inputs>({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  const formSubmit: SubmitHandler<Inputs> = async (form) => {
+    const {name, email, password} = form;
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+        }),
+      });
+      console.log(res);
+      console.log("Success login");
+      if (res.ok) {
+        return router.push(
+          `/signin?callbackUrl=${callbackUrl}&success=Account has been created`
+        );
+      } else {
+        const data = await res.json();
+        throw new Error(data.message);
+      }
+    } catch (err: any) {
+      const error =
+        err.message && err.message.indexOf("E11000") === 0
+          ? "Email is duplicate"
+          : err.message;
+      toast.error(error || "error");
+    }
+  };
+
   return (
     <>
       <div className="mx-auto max-w-2xl lg:max-w-7xl">
@@ -22,7 +78,7 @@ const FormRegister = () => {
           <div className="card-body">
             <h1 className="card-title">Register</h1>
 
-            <form>
+            <form onSubmit={handleSubmit(formSubmit)}>
               <div className="my-2">
                 <label className="label" htmlFor="name">
                   Name
@@ -30,14 +86,14 @@ const FormRegister = () => {
                 <input
                   type="text"
                   id="name"
-                  // {...register('name', {
-                  //     required: 'Name is required',
-                  // })}
+                  {...register("name", {
+                    required: "Name is required",
+                  })}
                   className="input input-bordered w-full max-w-sm"
                 />
-                {/* {errors.name?.message && (
-                            <div className="text-error">{errors.name.message}</div>
-                        )} */}
+                {errors.name?.message && (
+                  <div className="text-error">{errors.name.message}</div>
+                )}
               </div>
               <div className="my-2">
                 <label className="label" htmlFor="email">
@@ -46,18 +102,18 @@ const FormRegister = () => {
                 <input
                   type="text"
                   id="email"
-                  // {...register('email', {
-                  //     required: 'Email is required',
-                  //     pattern: {
-                  //         value: /[a-z0-9]+@[a-z]+\.[a-z]{2,3}/,
-                  //         message: 'Email is invalid',
-                  //     },
-                  // })}
+                  {...register("email", {
+                    required: "Email is required",
+                    pattern: {
+                      value: /[a-z0-9]+@[a-z]+\.[a-z]{2,3}/,
+                      message: "Email is invalid",
+                    },
+                  })}
                   className="input input-bordered w-full max-w-sm"
                 />
-                {/* {errors.email?.message && (
-                            <div className="text-error"> {errors.email.message}</div>
-                        )} */}
+                {errors.email?.message && (
+                  <div className="text-error"> {errors.email.message}</div>
+                )}
               </div>
               <div className="my-2">
                 <label className="label" htmlFor="password">
@@ -66,14 +122,14 @@ const FormRegister = () => {
                 <input
                   type="password"
                   id="password"
-                  // {...register('password', {
-                  //     required: 'Password is required',
-                  // })}
+                  {...register("password", {
+                    required: "Password is required",
+                  })}
                   className="input input-bordered w-full max-w-sm"
                 />
-                {/* {errors.password?.message && (
-                            <div className="text-error">{errors.password.message}</div>
-                        )} */}
+                {errors.password?.message && (
+                  <div className="text-error">{errors.password.message}</div>
+                )}
               </div>
               <div className="my-2">
                 <label className="label" htmlFor="confirmPassword">
@@ -82,26 +138,30 @@ const FormRegister = () => {
                 <input
                   type="password"
                   id="confirmPassword"
-                  // {...register('confirmPassword', {
-                  //     required: 'Confirm Password is required',
-                  //     validate: (value) => {
-                  //         const { password } = getValues()
-                  //         return password === value || 'Passwords should match!'
-                  //     },
-                  // })}
+                  {...register("confirmPassword", {
+                    required: "Confirm Password is required",
+                    validate: (value) => {
+                      const {password} = getValues();
+                      return password === value || "Passwords should match!";
+                    },
+                  })}
                   className="input input-bordered w-full max-w-sm"
                 />
-                {/* {errors.confirmPassword?.message && (
-                            <div className="text-error">{errors.confirmPassword.message}</div>
-                        )} */}
+                {errors.confirmPassword?.message && (
+                  <div className="text-error">
+                    {errors.confirmPassword.message}
+                  </div>
+                )}
               </div>
               <div className="my-2">
                 <button
                   type="submit"
-                  disabled
-                  className="btn btn-primary w-full"
+                  disabled={isSubmitting}
+                  className="btn btn-primary w-full mt-5"
                 >
-                  <span className="loading loading-spinner"></span>
+                  {isSubmitting && (
+                    <span className="loading loading-spinner"></span>
+                  )}
                   Register
                 </button>
               </div>
@@ -110,7 +170,10 @@ const FormRegister = () => {
             <div className="divider"> </div>
             <div>
               Already have an account?{" "}
-              <Link className="link" href={`/signin`}>
+              <Link
+                className="link"
+                href={`/signin?callbackUrl=${callbackUrl}`}
+              >
                 Login
               </Link>
             </div>
